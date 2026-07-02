@@ -46,7 +46,11 @@ function App() {
   const [customers, setCustomers] = useState([]);
 
   // Form States
-  const [newProduct, setNewProduct] = useState({ name: '', price: '', image_url: '' });
+  const [newProduct, setNewProduct] = useState({ name: '', price: '' });
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY || '';
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '' });
   const [newKey, setNewKey] = useState({ provider: '', name: '', api_key: '', base_url: '' });
 
@@ -230,13 +234,42 @@ function App() {
   // --- ADMIN ACTIONS ---
   const handleAddProduct = async (e) => {
     e.preventDefault();
+    if (!imageFile && !newProduct.image_url) return alert('Silakan pilih gambar produk (Jepret/Galeri)!');
+    
+    setUploadingImage(true);
     try {
-      await axios.post(`${API_URL}/products`, newProduct);
-      setNewProduct({ name: '', price: '', image_url: '' });
+      let finalImageUrl = newProduct.image_url || '';
+
+      // Upload to ImgBB if there's a file
+      if (imageFile) {
+        if (!IMGBB_API_KEY) {
+          alert('Sistem belum dikonfigurasi dengan ImgBB API Key. Hubungi Admin.');
+          setUploadingImage(false);
+          return;
+        }
+        
+        const formData = new FormData();
+        formData.append('image', imageFile);
+        
+        const imgbbRes = await axios.post(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        
+        finalImageUrl = imgbbRes.data.data.url;
+      }
+
+      await axios.post(`${API_URL}/products`, { ...newProduct, image_url: finalImageUrl });
+      
+      setNewProduct({ name: '', price: '' });
+      setImageFile(null);
+      setImagePreview('');
       fetchProducts();
       alert('Produk berhasil ditambahkan!');
     } catch (error) {
-      alert('Gagal tambah produk.');
+      console.error(error);
+      alert('Gagal tambah produk. Cek API Key ImgBB atau koneksi internet.');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -391,8 +424,42 @@ function App() {
           <h2 style={{ fontSize: '18px', fontWeight: 700 }}>+ Tambah Produk Baru</h2>
           <input required type="text" placeholder="Nama Produk" className="admin-input" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} />
           <input required type="number" placeholder="Harga (Rp)" className="admin-input" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} />
-          <input required type="url" placeholder="URL Link Gambar" className="admin-input" value={newProduct.image_url} onChange={e => setNewProduct({...newProduct, image_url: e.target.value})} />
-          <button type="submit" className="btn-primary"><PlusCircle size={18}/> Tambah</button>
+          
+          <div style={{ position: 'relative' }}>
+            <label style={{ fontSize: '14px', fontWeight: 600, color: '#4b5563', marginBottom: '8px', display: 'block' }}>
+              Foto Produk (Kamera / Galeri)
+            </label>
+            <input 
+              type="file" 
+              accept="image/*" 
+              capture="environment" 
+              onChange={e => {
+                const file = e.target.files[0];
+                if (file) {
+                  setImageFile(file);
+                  setImagePreview(URL.createObjectURL(file));
+                }
+              }} 
+              style={{ width: '100%', padding: '10px', background: '#f9fafb', borderRadius: '12px', border: '1px solid #e5e7eb', cursor: 'pointer' }} 
+            />
+          </div>
+          
+          {imagePreview && (
+            <div style={{ position: 'relative', width: '100%', height: '150px' }}>
+              <img src={imagePreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '12px' }} />
+              <button 
+                type="button" 
+                onClick={() => { setImageFile(null); setImagePreview(''); }}
+                style={{ position: 'absolute', top: '8px', right: '8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                X
+              </button>
+            </div>
+          )}
+
+          <button type="submit" className="btn-primary" disabled={uploadingImage} style={{ opacity: uploadingImage ? 0.7 : 1 }}>
+            {uploadingImage ? <Loader2 className="animate-spin" size={18}/> : <PlusCircle size={18}/>} 
+            {uploadingImage ? ' Menyimpan Gambar...' : ' Tambah Produk'}
+          </button>
         </form>
         <div className="glass-panel" style={{ padding: '24px' }}>
           <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px' }}>Daftar Produk</h2>
