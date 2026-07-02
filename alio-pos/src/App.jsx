@@ -273,7 +273,7 @@ function App() {
       setNewProduct({ name: '', price: '' }); setImageFile(null); setImagePreview('');
       fetchProducts(); alert('Produk berhasil ditambahkan!');
     } catch (error) {
-      console.error(error); alert('Gagal tambah produk.');
+      console.error(error); alert('Gagal tambah produk: ' + (error.response?.data?.error?.message || error.response?.data?.error || error.message));
     } finally {
       setUploadingImage(false);
     }
@@ -299,7 +299,7 @@ function App() {
       setStoreName(storeSettings.store_name);
       alert('Pengaturan Toko Berhasil Disimpan!');
     } catch (error) {
-      alert('Gagal menyimpan pengaturan.');
+      alert('Gagal menyimpan pengaturan: ' + (error.response?.data?.error?.message || error.response?.data?.error || error.message));
     }
   };
 
