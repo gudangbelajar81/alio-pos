@@ -40,6 +40,21 @@ async function syncDatabase() {
       )
     `);
 
+    // Phase 9 Migrations: Add new columns if they don't exist
+    const addColumn = async (table, columnDef) => {
+      try {
+        await conn.query(`ALTER TABLE ${table} ADD COLUMN ${columnDef}`);
+        console.log(`✅ Added column ${columnDef} to ${table}`);
+      } catch (err) {
+        if (err.code !== 'ER_DUP_FIELDNAME') console.error(`Error adding column: ${err.message}`);
+      }
+    };
+
+    await addColumn('users', "admin_pin VARCHAR(10) DEFAULT '1234'");
+    await addColumn('users', "store_logo VARCHAR(500) DEFAULT ''");
+    await addColumn('users', "theme_color VARCHAR(20) DEFAULT '#4F46E5'");
+    await addColumn('users', "tax_rate DECIMAL(5,2) DEFAULT 11.00");
+
     await conn.query(`
       CREATE TABLE IF NOT EXISTS categories (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -68,6 +83,10 @@ async function syncDatabase() {
         user_id INT NOT NULL DEFAULT 1
       )
     `);
+
+    await addColumn('orders', "subtotal DECIMAL(10,2) DEFAULT 0");
+    await addColumn('orders', "discount DECIMAL(10,2) DEFAULT 0");
+    await addColumn('orders', "tax_amount DECIMAL(10,2) DEFAULT 0");
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS order_items (
@@ -214,14 +233,14 @@ app.delete('/api/products/:id', authenticateToken, async (req, res) => {
 
 // --- ORDERS ---
 app.post('/api/orders', authenticateToken, async (req, res) => {
-  const { cart, subtotal, tax, total } = req.body;
+  const { cart, subtotal, tax, discount, total } = req.body;
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
 
     const [orderResult] = await connection.query(
-      'INSERT INTO orders (total_amount, user_id) VALUES (?, ?)',
-      [total, req.user.id]
+      'INSERT INTO orders (total_amount, subtotal, discount, tax_amount, user_id) VALUES (?, ?, ?, ?, ?)',
+      [total, subtotal || 0, discount || 0, tax || 0, req.user.id]
     );
     
     const orderId = orderResult.insertId;
@@ -243,14 +262,21 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
   }
 });
 
-// --- DASHBOARD STATS ---
+// --- DASHBOARD STATS & EXPORT ---
 app.get('/api/stats', authenticateToken, async (req, res) => {
   try {
     const [[stats]] = await db.query(
       'SELECT COUNT(id) as total_orders, SUM(total_amount) as total_revenue FROM orders WHERE DATE(created_at) = CURDATE() AND user_id = ?',
       [req.user.id]
     );
-    res.json(stats);
+    // Get Chart Data (Last 7 Days)
+    const [chartData] = await db.query(
+      `SELECT DATE_FORMAT(created_at, '%d %b') as date, SUM(total_amount) as revenue 
+       FROM orders WHERE user_id = ? AND created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) 
+       GROUP BY DATE(created_at) ORDER BY DATE(created_at) ASC`,
+      [req.user.id]
+    );
+    res.json({ ...stats, chartData });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -260,6 +286,18 @@ app.get('/api/orders/recent', authenticateToken, async (req, res) => {
   try {
     const [rows] = await db.query(
       'SELECT id, DATE_FORMAT(created_at, "%H:%i") as time, total_amount as total, status FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 5',
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/orders/all', authenticateToken, async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      'SELECT id, DATE_FORMAT(created_at, "%Y-%m-%d %H:%i") as datetime, subtotal, discount, tax_amount, total_amount as total, status FROM orders WHERE user_id = ? ORDER BY created_at DESC',
       [req.user.id]
     );
     res.json(rows);
@@ -328,6 +366,30 @@ app.put('/api/keys/:id/status', authenticateToken, async (req, res) => {
   try {
     await db.query('UPDATE api_keys_manager SET status = ? WHERE id = ? AND user_id = ?', [status, req.params.id, req.user.id]);
     res.json({ success: true, message: 'Status API Key berhasil diubah' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- SETTINGS (STORE PROFILE) ---
+app.get('/api/settings', authenticateToken, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT store_name, admin_pin, store_logo, theme_color, tax_rate FROM users WHERE id = ?', [req.user.id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    res.json(rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/settings', authenticateToken, async (req, res) => {
+  const { store_name, admin_pin, store_logo, theme_color, tax_rate } = req.body;
+  try {
+    await db.query(
+      'UPDATE users SET store_name = ?, admin_pin = ?, store_logo = ?, theme_color = ?, tax_rate = ? WHERE id = ?',
+      [store_name, admin_pin, store_logo, theme_color, tax_rate, req.user.id]
+    );
+    res.json({ success: true, message: 'Pengaturan berhasil disimpan!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
