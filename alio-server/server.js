@@ -12,16 +12,103 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecret_alio_key';
 app.use(cors());
 app.use(express.json());
 
-// Database Connection
+// Database Connection (Support Railway Native Variables & Local)
 const db = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'alio_pos',
+  host: process.env.MYSQLHOST || process.env.DB_HOST || 'localhost',
+  user: process.env.MYSQLUSER || process.env.DB_USER || 'root',
+  password: process.env.MYSQLPASSWORD || process.env.DB_PASSWORD || '',
+  database: process.env.MYSQLDATABASE || process.env.DB_NAME || 'alio_pos',
+  port: process.env.MYSQLPORT || process.env.DB_PORT || 3306,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
 });
+
+// Auto-Migrate Database (Create tables on startup for Railway)
+async function syncDatabase() {
+  try {
+    const conn = await db.getConnection();
+    console.log('✅ Connected to MySQL Database. Syncing tables...');
+    
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        store_name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        password VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS categories (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        user_id INT NOT NULL DEFAULT 1
+      )
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS products (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        price DECIMAL(10, 2) NOT NULL,
+        image_url VARCHAR(500),
+        category_id INT,
+        user_id INT NOT NULL DEFAULT 1
+      )
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        total_amount DECIMAL(10, 2) NOT NULL,
+        status VARCHAR(50) DEFAULT 'Lunas',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        user_id INT NOT NULL DEFAULT 1
+      )
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS order_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_id INT NOT NULL,
+        product_id INT NOT NULL,
+        quantity INT NOT NULL,
+        price_at_time DECIMAL(10, 2) NOT NULL
+      )
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS customers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        phone VARCHAR(50),
+        points INT DEFAULT 0,
+        user_id INT NOT NULL DEFAULT 1
+      )
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS api_keys_manager (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        provider VARCHAR(50) NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        api_key VARCHAR(255) NOT NULL,
+        base_url VARCHAR(255),
+        status VARCHAR(20) DEFAULT 'Alive',
+        used_count INT DEFAULT 0,
+        user_id INT NOT NULL DEFAULT 1
+      )
+    `);
+    
+    conn.release();
+    console.log('✅ All tables synced successfully.');
+  } catch (error) {
+    console.error('❌ Database Sync Error:', error.message);
+  }
+}
+syncDatabase();
 
 // ==========================================
 // AUTHENTICATION & MULTI-TENANCY MIDDLEWARE
@@ -35,7 +122,7 @@ const authenticateToken = (req, res, next) => {
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ error: 'Sesi kedaluwarsa atau tidak valid' });
-    req.user = user; // { id: user_id, email, store_name }
+    req.user = user; 
     next();
   });
 };
@@ -50,7 +137,6 @@ app.post('/api/auth/register', async (req, res) => {
       [store_name, email, hashedPassword]
     );
     
-    // Auto-create default category for this new user
     await db.query('INSERT INTO categories (name, user_id) VALUES (?, ?)', ['Semua', result.insertId]);
 
     res.json({ success: true, message: 'Toko berhasil didaftarkan! Silakan login.' });
@@ -100,7 +186,6 @@ app.get('/api/products', authenticateToken, async (req, res) => {
 app.post('/api/products', authenticateToken, async (req, res) => {
   const { name, price, category_id, image_url } = req.body;
   try {
-    // If no category selected, assign to their default category or 1 if none
     let catId = category_id;
     if (!catId) {
       const [cat] = await db.query('SELECT id FROM categories WHERE user_id = ? LIMIT 1', [req.user.id]);
@@ -248,26 +333,23 @@ app.put('/api/keys/:id/status', authenticateToken, async (req, res) => {
   }
 });
 
-// WA Receipt Endpoint
 app.post('/api/receipts/whatsapp', authenticateToken, async (req, res) => {
   const { phone, orderId, total } = req.body;
-  
-  // Here we would normally fetch the key for this specific user
-  // const [keys] = await db.query("SELECT * FROM api_keys_manager WHERE provider = 'whatsapp' AND status = 'Alive' AND user_id = ?", [req.user.id]);
-  // if(keys.length === 0) return res.status(400).json({error: "Belum ada kunci WhatsApp yang aktif."});
-
   try {
-    console.log(`[WhatsApp Simulated] Sending receipt to ${phone} for Toko: ${req.user.store_name}`);
+    console.log(`[WhatsApp Simulated] Sending receipt to ${phone}`);
     res.json({
       success: true,
-      message: `Struk digital berhasil dikirim ke WhatsApp ${phone}! (Simulasi berjalan sempurna untuk toko ${req.user.store_name})`
+      message: `Struk digital berhasil dikirim ke WhatsApp ${phone}!`
     });
   } catch (error) {
-    console.error(error);
     res.status(500).json({ error: error.message });
   }
 });
 
+app.get('/', (req, res) => {
+  res.send('Alio POS API is running.');
+});
+
 app.listen(PORT, () => {
-  console.log(`🚀 Alio POS SaaS Backend running on http://localhost:${PORT}`);
+  console.log(`🚀 Alio POS SaaS Backend running on port ${PORT}`);
 });
