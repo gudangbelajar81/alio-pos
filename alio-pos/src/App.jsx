@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import './App.css';
 
-let API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'; if (API_URL && !API_URL.endsWith('/api')) API_URL += '/api';
+let API_URL = import.meta.env.VITE_API_URL || 'https://alio-pos-production-738a.up.railway.app/api'; if (API_URL && !API_URL.endsWith('/api')) API_URL += '/api';
 const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY || '';
 
 function App() {
