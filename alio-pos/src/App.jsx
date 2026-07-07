@@ -250,7 +250,7 @@ function App() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', `Laporan_Alio_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `Laporan_AlioBos_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -312,7 +312,7 @@ function App() {
         <div className="glass-panel" style={{ width: '400px', padding: '40px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ background: 'var(--primary)', color: 'white', width: '64px', height: '64px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}><Package size={32} /></div>
-            <h1 style={{ fontSize: '24px', fontWeight: 800 }}>Alio SaaS POS</h1>
+            <h1 style={{ fontSize: '24px', fontWeight: 800 }}>Alio Bos SaaS</h1>
             <p style={{ color: 'var(--text-muted)' }}>{authMode === 'login' ? 'Masuk ke sistem kasir' : 'Daftar bisnis gratis'}</p>
           </div>
           <form onSubmit={handleAuthSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -571,7 +571,7 @@ function App() {
             <div className="struk-item"><div>PPN ({storeSettings.tax_rate}%)</div><div>{formatRupiah(lastOrderDetails.tax)}</div></div>
             <div className="struk-total"><div>TOTAL</div><div>{formatRupiah(lastOrderDetails.total)}</div></div>
           </div>
-          <div className="struk-footer">Terima kasih atas kunjungan Anda!<br/>Powered by Alio SaaS POS</div>
+          <div className="struk-footer">Terima kasih atas kunjungan Anda!<br/>Powered by Alio Bos SaaS</div>
         </div>
       )}
     </>

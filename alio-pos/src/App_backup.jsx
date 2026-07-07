@@ -338,7 +338,7 @@ function App() {
             <div style={{ background: 'var(--primary)', color: 'white', width: '64px', height: '64px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
               <Package size={32} />
             </div>
-            <h1 style={{ fontSize: '24px', fontWeight: 800 }}>Alio SaaS POS</h1>
+            <h1 style={{ fontSize: '24px', fontWeight: 800 }}>Alio Bos SaaS</h1>
             <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '8px' }}>
               {authMode === 'login' ? 'Masuk ke sistem kasir toko Anda' : 'Daftarkan bisnis Anda gratis'}
             </p>
@@ -621,7 +621,7 @@ function App() {
           <div className="logo-container">
             <div className="logo-icon"><Package size={28} /></div>
             <div>
-              <div className="logo-text">Alio POS</div>
+              <div className="logo-text">Alio Bos</div>
               <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600 }}>Toko: {storeName}</div>
             </div>
           </div>
@@ -680,7 +680,7 @@ function App() {
             <div className="struk-item"><div>PPN (11%)</div><div>{formatRupiah(lastOrderDetails.tax)}</div></div>
             <div className="struk-total"><div>TOTAL</div><div>{formatRupiah(lastOrderDetails.total)}</div></div>
           </div>
-          <div className="struk-footer">Terima kasih atas kunjungan Anda!<br/>Powered by Alio SaaS POS</div>
+          <div className="struk-footer">Terima kasih atas kunjungan Anda!<br/>Powered by Alio Bos SaaS</div>
         </div>
       )}
     </>
