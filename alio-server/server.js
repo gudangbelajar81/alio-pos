@@ -409,9 +409,9 @@ app.post('/api/receipts/whatsapp', authenticateToken, async (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.send('Alio POS API is running.');
+  res.send('Alio Bos API is running.');
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Alio POS SaaS Backend running on port ${PORT}`);
+  console.log(`🚀 Alio Bos SaaS Backend running on port ${PORT}`);
 });
